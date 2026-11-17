@@ -1,0 +1,6 @@
+node_modules/
+log/
+local.log
+.env
+.idea/
+.DS_Store

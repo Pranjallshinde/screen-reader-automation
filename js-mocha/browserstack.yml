@@ -1,0 +1,27 @@
+# Credentials are read from the environment: BROWSERSTACK_USERNAME / BROWSERSTACK_ACCESS_KEY
+userName: ${BROWSERSTACK_USERNAME}
+accessKey: ${BROWSERSTACK_ACCESS_KEY}
+
+# Keep these static across runs (required by Accessibility "Automated tests").
+projectName: Screen Reader Automation Demo
+buildName: bstackdemo-screen-reader-mocha
+
+# Screen reader automation: NVDA on Windows 11 (macOS/VoiceOver is rejected by the grid today)
+platforms:
+  - os: Windows
+    osVersion: 11
+    browserName: chrome
+    browserVersion: latest
+
+parallelsPerPlatform: 1
+
+# srAutomation publishes the report under Accessibility > Screen Reader > Automation (Node.js SDK).
+srAutomation: true
+accessibility: true
+accessibilityOptions:
+  wcagVersion: wcag21aa
+  includeIssueType:
+    bestPractice: true
+    needsReview: true
+
+browserstackLocal: false

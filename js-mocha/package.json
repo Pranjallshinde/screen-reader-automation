@@ -1,0 +1,14 @@
+{
+  "name": "screen-reader-automation-mocha",
+  "version": "1.0.0",
+  "description": "BrowserStack screen reader automation (NVDA on Windows) with Mocha + selenium-webdriver via the BrowserStack Node SDK",
+  "scripts": {
+    "test": "browserstack-node-sdk mocha test/specs/*.spec.js --timeout 180000 --retries 0"
+  },
+  "devDependencies": {
+    "browserstack-node-sdk": "latest",
+    "chai": "^4.4.1",
+    "mocha": "^10.4.0",
+    "selenium-webdriver": "^4.25.0"
+  }
+}
