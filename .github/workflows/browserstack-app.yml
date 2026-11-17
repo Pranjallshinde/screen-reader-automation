@@ -18,12 +18,12 @@ on:
         type: string
         required: true
         default: npm test
-      browserstack_username:
-        description: 'Optional: your BrowserStack username (leave empty to use the repo secret)'
+      BROWSERSTACK_USERNAME:
+        description: 'BrowserStack username (leave empty to use the repo secret)'
         type: string
         required: false
-      browserstack_access_key:
-        description: 'Optional: your BrowserStack access key (leave empty to use the repo secret). Visible to people who can view this run.'
+      BROWSERSTACK_ACCESS_KEY:
+        description: 'BrowserStack access key (leave empty to use the repo secret)'
         type: string
         required: false
       build_name:
@@ -39,9 +39,6 @@ permissions:
   contents: read
 
 env:
-  # Inputs (if given) win over repo secrets, so anyone can run on their own / a demo account.
-  BROWSERSTACK_USERNAME: ${{ github.event.inputs.browserstack_username || secrets.BROWSERSTACK_USERNAME }}
-  BROWSERSTACK_ACCESS_KEY: ${{ github.event.inputs.browserstack_access_key || secrets.BROWSERSTACK_ACCESS_KEY }}
   BROWSERSTACK_BUILD_NAME: ${{ github.event.inputs.build_name }}
   BUILD_NUMBER: ${{ github.run_number }}
 
@@ -56,16 +53,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Mask BrowserStack credentials
+      # Load & mask BrowserStack credentials. Run inputs win; otherwise the repo secrets are used.
+      # Secrets are passed through env (not inlined in the script) and masked before they reach GITHUB_ENV.
+      - name: Load BrowserStack credentials
+        shell: bash
         working-directory: .
+        env:
+          SECRET_USER: ${{ secrets.BROWSERSTACK_USERNAME }}
+          SECRET_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
         run: |
-          for v in "$BROWSERSTACK_USERNAME" "$BROWSERSTACK_ACCESS_KEY"; do
-            if [ -n "$v" ]; then echo "::add-mask::$v"; fi
-          done
-          if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
-            echo "::error::Provide browserstack_username / browserstack_access_key inputs, or set BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY repository secrets."
+          set +x
+
+          BS_USER=$(jq -r '.inputs.BROWSERSTACK_USERNAME // empty' "$GITHUB_EVENT_PATH")
+          BS_KEY=$(jq -r '.inputs.BROWSERSTACK_ACCESS_KEY // empty' "$GITHUB_EVENT_PATH")
+          BS_USER="${BS_USER:-$SECRET_USER}"
+          BS_KEY="${BS_KEY:-$SECRET_KEY}"
+
+          if [ -z "$BS_USER" ]; then
+            echo "BrowserStack username missing (enter it as a run input or set the BROWSERSTACK_USERNAME secret)."
             exit 1
           fi
+
+          if [ -z "$BS_KEY" ]; then
+            echo "BrowserStack access key missing (enter it as a run input or set the BROWSERSTACK_ACCESS_KEY secret)."
+            exit 1
+          fi
+
+          echo "::add-mask::$BS_USER"
+          echo "::add-mask::$BS_KEY"
+
+          echo "BROWSERSTACK_USERNAME=$BS_USER" >> "$GITHUB_ENV"
+          echo "BROWSERSTACK_ACCESS_KEY=$BS_KEY" >> "$GITHUB_ENV"
+
+          echo "BrowserStack credentials loaded successfully."
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
