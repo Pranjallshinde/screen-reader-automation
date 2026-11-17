@@ -3,6 +3,9 @@ package com.browserstack.tests;
 import static org.testng.Assert.assertTrue;
 
 import com.browserstack.utils.ScreenReader;
+import com.browserstack.utils.SpokenCsv;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +83,11 @@ public class ScreenReaderTest {
         }
         System.out.println("Traversal recorded " + trail.size() + " elements");
         System.out.println("Full spoken trail: " + trail);
+
+        // Frameworks without BrowserStack's Screen Reader > Automation report can still capture the spoken text.
+        Path csv = SpokenCsv.write("spoken-description", ScreenReader.NEXT, trail);
+        System.out.println("Spoken description saved to " + csv.toAbsolutePath());
+        assertTrue(Files.exists(csv) && csv.toFile().length() > 0, "spoken-description CSV was not written");
 
         String joined = String.join(" | ", trail);
         assertTrue(trail.size() > 10, "screen reader reached too few elements");

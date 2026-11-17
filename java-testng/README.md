@@ -25,5 +25,18 @@ mvn test
   test browser, because NVDA otherwise skips plain text. Capped at 45 steps (about 8s per step on the grid).
 - **Alt text:** logs how many product images have missing or generic alt text.
 
+## Spoken description CSV (for frameworks without the Screen Reader report)
+BrowserStack's Screen Reader > Automation report is not available for Java, but the spoken description can still be
+captured. The traversal test writes every step NVDA spoke to `target/spoken-output/spoken-description.csv`
+(`step,shortcut,spoken_text`), using `SpokenCsv` in `src/test/java/com/browserstack/utils`. Attach it to your CI build
+artifacts or open it in a spreadsheet for offline review. Example rows:
+
+```
+step,shortcut,spoken_text
+2,"next_focusable_item","Favourites link"
+8,"next_focusable_item","Vendors: heading level 4"
+9,"next_focusable_item","Apple check box not checked"
+```
+
 ## Notes
 - Credentials come only from environment variables; nothing secret is committed.
