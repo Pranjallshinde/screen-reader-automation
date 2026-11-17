@@ -1,0 +1,22 @@
+# Credentials are read from the environment: BROWSERSTACK_USERNAME / BROWSERSTACK_ACCESS_KEY
+userName: ${BROWSERSTACK_USERNAME}
+accessKey: ${BROWSERSTACK_ACCESS_KEY}
+
+projectName: Screen Reader Automation Demo
+buildName: bstackdemo-screen-reader-java
+buildIdentifier: '#${BUILD_NUMBER}'
+
+# Screen reader automation: NVDA on Windows 11 (macOS/VoiceOver is rejected by the grid today)
+platforms:
+  - os: Windows
+    osVersion: 11
+    browserName: chrome
+    browserVersion: latest
+
+parallelsPerPlatform: 1
+
+# Screen reader automation report (Accessibility dashboard > Screen Reader > Automation).
+# Docs: reports are documented for Node.js / C# SDKs; spoken output and video work for every framework.
+srAutomation: true
+accessibility: true
+browserstackLocal: false
