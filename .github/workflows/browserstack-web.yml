@@ -1,0 +1,109 @@
+name: BrowserStack Web Tests
+
+# Run web tests on BrowserStack: Actions tab > BrowserStack Web Tests > Run workflow.
+# Also runs on pushes / PRs to main (js-mocha) and nightly.
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Which suite to run'
+        type: choice
+        required: true
+        default: js-mocha
+        options:
+          - js-mocha
+          - java-testng
+      browserstack_username:
+        description: 'Optional: your BrowserStack username (leave empty to use the repo secret)'
+        type: string
+        required: false
+      browserstack_access_key:
+        description: 'Optional: your BrowserStack access key (leave empty to use the repo secret). Visible to people who can view this run.'
+        type: string
+        required: false
+      build_name:
+        description: 'Optional build name override (leave empty to use browserstack.yml)'
+        type: string
+        required: false
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 2 * * *'
+
+concurrency:
+  group: browserstack-web-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT: ${{ github.event.inputs.project || 'js-mocha' }}
+  # Inputs (if given) win over repo secrets, so anyone can run on their own / a demo account.
+  BROWSERSTACK_USERNAME: ${{ github.event.inputs.browserstack_username || secrets.BROWSERSTACK_USERNAME }}
+  BROWSERSTACK_ACCESS_KEY: ${{ github.event.inputs.browserstack_access_key || secrets.BROWSERSTACK_ACCESS_KEY }}
+  BROWSERSTACK_BUILD_NAME: ${{ github.event.inputs.build_name }}
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  web:
+    name: Web / ${{ github.event.inputs.project || 'js-mocha' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ${{ github.event.inputs.project || 'js-mocha' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask BrowserStack credentials
+        working-directory: .
+        run: |
+          # Mask first so the values never appear in later log lines.
+          for v in "$BROWSERSTACK_USERNAME" "$BROWSERSTACK_ACCESS_KEY"; do
+            if [ -n "$v" ]; then echo "::add-mask::$v"; fi
+          done
+          if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
+            echo "::error::Provide browserstack_username / browserstack_access_key inputs, or set BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY repository secrets."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        if: startsWith(github.event.inputs.project || 'js-mocha', 'js-')
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ github.event.inputs.project || 'js-mocha' }}/package-lock.json
+
+      - name: Set up Java
+        if: github.event.inputs.project == 'java-testng'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: maven
+
+      - name: Install dependencies (JS)
+        if: startsWith(github.event.inputs.project || 'js-mocha', 'js-')
+        run: npm ci
+
+      - name: Run tests on BrowserStack (JS)
+        if: startsWith(github.event.inputs.project || 'js-mocha', 'js-')
+        run: npm test
+
+      - name: Run tests on BrowserStack (Java)
+        if: github.event.inputs.project == 'java-testng'
+        run: mvn --batch-mode test
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ github.event.inputs.project || 'js-mocha' }}-logs
+          path: |
+            ${{ github.event.inputs.project || 'js-mocha' }}/log/
+            ${{ github.event.inputs.project || 'js-mocha' }}/logs/
+          if-no-files-found: ignore

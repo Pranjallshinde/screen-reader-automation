@@ -1,0 +1,112 @@
+name: BrowserStack App Tests
+
+# Run mobile app tests on BrowserStack: Actions tab > BrowserStack App Tests > Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Local path (e.g. ./app.apk) or an existing bs:// app id / custom id'
+        type: string
+        required: true
+      app_dir:
+        description: 'Directory of the app test project'
+        type: string
+        required: true
+        default: js-app
+      app_test_command:
+        description: 'Command that runs the app tests (run from app_dir)'
+        type: string
+        required: true
+        default: npm test
+      browserstack_username:
+        description: 'Optional: your BrowserStack username (leave empty to use the repo secret)'
+        type: string
+        required: false
+      browserstack_access_key:
+        description: 'Optional: your BrowserStack access key (leave empty to use the repo secret). Visible to people who can view this run.'
+        type: string
+        required: false
+      build_name:
+        description: 'Optional build name override'
+        type: string
+        required: false
+
+concurrency:
+  group: browserstack-app-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Inputs (if given) win over repo secrets, so anyone can run on their own / a demo account.
+  BROWSERSTACK_USERNAME: ${{ github.event.inputs.browserstack_username || secrets.BROWSERSTACK_USERNAME }}
+  BROWSERSTACK_ACCESS_KEY: ${{ github.event.inputs.browserstack_access_key || secrets.BROWSERSTACK_ACCESS_KEY }}
+  BROWSERSTACK_BUILD_NAME: ${{ github.event.inputs.build_name }}
+  BUILD_NUMBER: ${{ github.run_number }}
+
+jobs:
+  app:
+    name: App / ${{ github.event.inputs.app_dir }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: ${{ github.event.inputs.app_dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask BrowserStack credentials
+        working-directory: .
+        run: |
+          for v in "$BROWSERSTACK_USERNAME" "$BROWSERSTACK_ACCESS_KEY"; do
+            if [ -n "$v" ]; then echo "::add-mask::$v"; fi
+          done
+          if [ -z "$BROWSERSTACK_USERNAME" ] || [ -z "$BROWSERSTACK_ACCESS_KEY" ]; then
+            echo "::error::Provide browserstack_username / browserstack_access_key inputs, or set BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY repository secrets."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Upload app to BrowserStack (if a local file)
+        id: upload
+        env:
+          APP_INPUT: ${{ github.event.inputs.app }}
+        run: |
+          set -euo pipefail
+          if [ -f "$APP_INPUT" ]; then
+            # -u reads creds from env so they never appear in the command line / logs
+            RESPONSE=$(curl -sS --fail -u "$BROWSERSTACK_USERNAME:$BROWSERSTACK_ACCESS_KEY" \
+              -X POST "https://api-cloud.browserstack.com/app-automate/upload" \
+              -F "file=@$APP_INPUT")
+            APP_URL=$(echo "$RESPONSE" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).app_url||""))')
+            if [ -z "$APP_URL" ]; then echo "::error::App upload failed"; exit 1; fi
+          else
+            APP_URL="$APP_INPUT"
+          fi
+          echo "app_url=$APP_URL" >> "$GITHUB_OUTPUT"
+          echo "Using app: $APP_URL"
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Run app tests on BrowserStack
+        env:
+          BROWSERSTACK_APP: ${{ steps.upload.outputs.app_url }}
+          TEST_COMMAND: ${{ github.event.inputs.app_test_command }}
+        run: bash -c "$TEST_COMMAND"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-logs
+          path: |
+            ${{ github.event.inputs.app_dir }}/log/
+            ${{ github.event.inputs.app_dir }}/logs/
+          if-no-files-found: ignore
