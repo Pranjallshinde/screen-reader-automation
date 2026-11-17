@@ -29,7 +29,8 @@ mvn test
 BrowserStack's Screen Reader > Automation report is not available for Java, but the spoken description can still be
 captured. The traversal test writes every step NVDA spoke to `target/spoken-output/spoken-description.csv`
 (`step,shortcut,spoken_text`), using `SpokenCsv` in `src/test/java/com/browserstack/utils`. Attach it to your CI build
-artifacts or open it in a spreadsheet for offline review. Example rows:
+artifacts or open it in a spreadsheet for offline review. A real captured run (45 steps) is committed at
+`sample-output/spoken-description.csv`. Example rows:
 
 ```
 step,shortcut,spoken_text
