@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       project:
-        description: 'Which suite to run'
+        description: 'Framework to run: js-mocha (JavaScript + Mocha) or java-testng (Java + TestNG)'
         type: choice
         required: true
         default: js-mocha
